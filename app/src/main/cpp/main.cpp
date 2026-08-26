@@ -9,13 +9,17 @@
 #include <cmath>
 #include "raylib.h"
 
+struct Star {
+    float x;
+    float y;
+    float speed;
+    float size;
+    Color color;
+};
+
 Texture2D LoadTextureSafe(const char* relativePath) {
     char fullPath[512];
     snprintf(fullPath, sizeof(fullPath), "%s%s", GetApplicationDirectory(), relativePath);
-    
-    bool exists = FileExists(fullPath);
-    printf("[DEBUG] Fichier: %s -> %s\n", relativePath, exists ? "TROUVE" : "INTROUVABLE !");
-    
     Texture2D tex = LoadTexture(fullPath);
     return tex;
 }
@@ -23,15 +27,10 @@ Texture2D LoadTextureSafe(const char* relativePath) {
 Image LoadImageSafe(const char* relativePath) {
     char fullPath[512];
     snprintf(fullPath, sizeof(fullPath), "%s%s", GetApplicationDirectory(), relativePath);
-
-    bool exists = FileExists(fullPath);
-    printf("[DEBUG] Fichier: %s -> %s\n", relativePath, exists ? "TROUVE" : "INTROUVABLE !");
-
     Image img = LoadImage(fullPath);
     return img;
 }
 
-// Multiplie une couleur par un facteur de luminosité (0 = noir, 1 = couleur pleine)
 Color ScaleColor(Color base, float t) {
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
@@ -43,14 +42,6 @@ Color ScaleColor(Color base, float t) {
     return result;
 }
 
-// Recolore le sprite du joueur à partir de son codage couleur d'origine :
-//   - ROUGE  -> couleur du joueur (partie éclairée du corps)
-//   - BLEU   -> ombre du corps, càd la couleur du joueur assombrie
-//   - VERT (clair ou foncé) -> visière, toujours BLANCHE (le dégradé vert d'origine
-//     donne le dégradé blanc/gris, la visière ne change donc jamais de couleur)
-//   - Le contour noir, l'ombre au sol et le reflet blanc restent inchangés.
-// Dans les 3 cas, la luminosité (value HSV) du pixel d'origine est conservée pour
-// garder le dégradé/anticrénelage du sprite, seule la teinte change.
 Image RecolorPlayerBody(Image source, Color targetColor) {
     Image result = ImageCopy(source);
     ImageFormat(&result, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
@@ -67,18 +58,17 @@ Image RecolorPlayerBody(Image source, Color targetColor) {
         Vector3 hsv = ColorToHSV(px);
         float hue = hsv.x, sat = hsv.y, val = hsv.z;
 
-        // Trop peu saturé (reflet blanc, ombre au sol) ou trop sombre (contour noir) -> inchangé
         if (sat < 0.15f || val < 0.18f) continue;
 
         Color newColor;
         bool recognized = true;
 
         if (hue <= 20.0f || hue >= 340.0f) {
-            newColor = ScaleColor(targetColor, val);        // rouge -> corps
+            newColor = ScaleColor(targetColor, val);
         } else if (hue >= 200.0f && hue <= 260.0f) {
-            newColor = ScaleColor(shadowColor, val);         // bleu -> ombre du corps
+            newColor = ScaleColor(shadowColor, val);
         } else if (hue >= 100.0f && hue <= 140.0f) {
-            newColor = ScaleColor(WHITE, val);                // vert -> visière blanche
+            newColor = ScaleColor(WHITE, val);
         } else {
             recognized = false;
         }
@@ -92,7 +82,6 @@ Image RecolorPlayerBody(Image source, Color targetColor) {
     return result;
 }
 
-// Régénère la texture GPU du joueur à partir de l'image CPU d'origine + la couleur choisie
 void ApplyPlayerColor(Image sourceImage, Color targetColor, Texture2D* outTexture) {
     if (sourceImage.data == nullptr) return;
     if (outTexture->id > 0) UnloadTexture(*outTexture);
@@ -101,7 +90,6 @@ void ApplyPlayerColor(Image sourceImage, Color targetColor, Texture2D* outTextur
     UnloadImage(recolored);
 }
 
-// Régénère TOUTES les frames du joueur (idle + marche) d'un coup, ex: après un clic sur une couleur
 void ApplyPlayerColorAll(Image* sourceImages, Texture2D* outTextures, int count, Color targetColor) {
     for (int i = 0; i < count; i++) {
         ApplyPlayerColor(sourceImages[i], targetColor, &outTextures[i]);
@@ -113,8 +101,6 @@ struct PlayerColorOption {
     Color color;
 };
 
-// Palette façon "vrai jeu" (12 couleurs classiques). "Rouge" reprend exactement
-// la couleur d'origine du sprite Idle.png pour qu'il n'y ait aucun changement par défaut.
 static PlayerColorOption colorPalette[] = {
     { "Rouge",  Color{ 255,  16,  16, 255 } },
     { "Bleu",   Color{  19,  46, 209, 255 } },
@@ -146,7 +132,17 @@ int main() {
     SetWindowPosition(0, 0);
     SetTargetFPS(60);
 
-    // --- CHARGEMENT DU FOND ANIMÉ ---
+    const int STAR_COUNT = 120;
+    Star stars[120];
+    for (int i = 0; i < STAR_COUNT; i++) {
+        stars[i].x = (float)(rand() % screenWidth);
+        stars[i].y = (float)(rand() % screenHeight);
+        stars[i].speed = (float)(rand() % 40 + 10);
+        stars[i].size = (float)(rand() % 3 + 1);
+        unsigned char alpha = (unsigned char)(rand() % 155 + 100);
+        stars[i].color = Color{ 255, 255, 255, alpha };
+    }
+
     int totalFrames = 0;
     while (true) {
         char relativePath[256];
@@ -172,7 +168,6 @@ int main() {
         }
     }
 
-    // --- CHARGEMENT DES TEXTURES MENU ---
     Texture2D btnOnline       = LoadTextureSafe("Assets/Menu/Online.png");
     Texture2D btnOnlineGreen  = LoadTextureSafe("Assets/Menu/OnlineGreen.png");
     Texture2D btnSettings     = LoadTextureSafe("Assets/Menu/Settings.png");
@@ -191,7 +186,6 @@ int main() {
 
     Texture2D texSkeldHost    = LoadTextureSafe("Assets/Menu/SkeldHost.png");
 
-    // Textures Players (4 à 10)
     Texture2D texPlayersLabel = LoadTextureSafe("Assets/Menu/Players.png");
     Texture2D texPlayerNum[7]; 
     for (int i = 0; i < 7; i++) {
@@ -200,7 +194,6 @@ int main() {
         texPlayerNum[i] = LoadTextureSafe(path);
     }
 
-    // Textures Imposteurs (1 à 3 + Imposters.png)
     Texture2D texImpostersLabel = LoadTextureSafe("Assets/Menu/Imposters.png");
     Texture2D texImposterNum[3];
     for (int i = 0; i < 3; i++) {
@@ -209,11 +202,8 @@ int main() {
         texImposterNum[i] = LoadTextureSafe(path);
     }
 
-    // --- CHARGEMENT DES TEXTURES GAME (LOBBY) ---
     Texture2D texLobby = LoadTextureSafe("Assets/Game/Lobby.png");
 
-    // --- CHARGEMENT DU JOUEUR (recolorable, animé) ---
-    // Index 0 = Idle, index 1..12 = walk1..walk12
     const int PLAYER_FRAME_COUNT = 13;
     Image playerFrameImagesCPU[PLAYER_FRAME_COUNT];
     Texture2D playerFrameTextures[PLAYER_FRAME_COUNT];
@@ -231,19 +221,19 @@ int main() {
         }
     }
 
-    Color selectedPlayerColor = colorPalette[0].color; // Rouge = couleur d'origine
+    Color selectedPlayerColor = colorPalette[0].color;
     ApplyPlayerColorAll(playerFrameImagesCPU, playerFrameTextures, PLAYER_FRAME_COUNT, selectedPlayerColor);
 
     Vector2 playerPos = { 0.0f, 0.0f };
-    float playerSpeed = 260.0f;   // pixels/seconde
+    float playerSpeed = 260.0f;
     float playerScale = 0.55f;
-    bool playerFacingLeft = false;   // false = regarde à droite (sens "normal" des sprites walk)
+    bool playerFacingLeft = false;
     bool isColorMenuOpen = false;
 
     bool isPlayerMoving = false;
-    int walkFrameIndex = 0;          // 0..11 -> correspond à walk1..walk12
+    int walkFrameIndex = 0;
     float walkAnimTimer = 0.0f;
-    float walkFrameDuration = 1.0f / 15.0f; // 15 images/seconde
+    float walkFrameDuration = 1.0f / 15.0f;
 
     int gameState = 0; 
     bool isSettingsOpen = false;
@@ -264,7 +254,14 @@ int main() {
         float deltaTime = GetFrameTime();
         Vector2 mousePos = GetMousePosition();
 
-        // Rectangle d'affichage de Lobby.png en conservant ses proportions (plus d'étirement)
+        for (int i = 0; i < STAR_COUNT; i++) {
+            stars[i].x -= stars[i].speed * deltaTime;
+            if (stars[i].x < 0) {
+                stars[i].x = (float)currentW;
+                stars[i].y = (float)(rand() % currentH);
+            }
+        }
+
         Rectangle lobbyImageRect = { 0.0f, 0.0f, (float)currentW, (float)currentH };
         if (texLobby.id > 0) {
             float texAspect = (float)texLobby.width / (float)texLobby.height;
@@ -294,7 +291,6 @@ int main() {
             }
         }
 
-        // --- ANIMATION FOND ---
         if (totalFrames > 0) {
             currentFrameTime += deltaTime;
             if (currentFrameTime >= frameDuration) {
@@ -314,7 +310,6 @@ int main() {
             }
         }
 
-        // --- MENU PRINCIPAL (0) ---
         if (gameState == 0) {
             float onlineScale = 0.8f;
             float onlineW = (btnOnline.width > 0) ? btnOnline.width * onlineScale : 250.0f;
@@ -330,7 +325,6 @@ int main() {
             if (CheckCollisionPointRec(mousePos, settingsRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) isSettingsOpen = !isSettingsOpen;
         }
 
-        // --- MENU ONLINE (1) ---
         if (gameState == 1) {
             float hostScale = 0.8f;
             float hostW = (btnHost.width > 0) ? btnHost.width * hostScale : 200.0f;
@@ -384,7 +378,6 @@ int main() {
             }
         }
 
-        // --- ÉCRAN HOST (2) ---
         if (gameState == 2) {
             float goBackScale = 0.8f;
             float goBackW = (btnGoBack.width > 0) ? btnGoBack.width * goBackScale : 80.0f;
@@ -409,14 +402,13 @@ int main() {
                 if (CheckCollisionPointRec(mousePos, numRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedImposters = i + 1;
             }
 
-            // Bouton Host de validation (en bas à droite)
             float confirmHostScale = 0.8f;
             float confirmHostW = (btnHost.width > 0) ? btnHost.width * confirmHostScale : 200.0f;
             float confirmHostH = (btnHost.height > 0) ? btnHost.height * confirmHostScale : 80.0f;
             Rectangle confirmHostRect = { (float)currentW - confirmHostW - 20.0f, (float)currentH - confirmHostH - 20.0f, confirmHostW, confirmHostH };
 
             if (CheckCollisionPointRec(mousePos, confirmHostRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                gameState = 3; // Lancement du lobby
+                gameState = 3;
                 isColorMenuOpen = false;
                 isPlayerMoving = false;
                 walkFrameIndex = 0;
@@ -430,7 +422,6 @@ int main() {
             }
         }
 
-        // --- LOBBY (3) ---
         if (gameState == 3) {
             if (IsKeyPressed(KEY_R)) isColorMenuOpen = !isColorMenuOpen;
 
@@ -467,17 +458,12 @@ int main() {
                     moveX /= len;
                     moveY /= len;
 
-                    // L'orientation ne change que sur un déplacement horizontal ; un déplacement
-                    // vertical seul garde l'orientation en cours (comme dans le vrai jeu, qui n'a
-                    // pas d'animation "monter/descendre" dédiée).
                     if (moveX > 0.0f) playerFacingLeft = false;
                     if (moveX < 0.0f) playerFacingLeft = true;
 
                     playerPos.x += moveX * playerSpeed * deltaTime;
                     playerPos.y += moveY * playerSpeed * deltaTime;
 
-                    // Cycle de marche walk1 -> walk12 -> walk1 ... (jamais inversé, seul le sprite
-                    // est retourné à l'écran quand on va vers la gauche, via playerFacingLeft)
                     walkAnimTimer += deltaTime;
                     if (walkAnimTimer >= walkFrameDuration) {
                         walkAnimTimer -= walkFrameDuration;
@@ -506,20 +492,24 @@ int main() {
             if (menuScaleAnim < 0.0f) menuScaleAnim = 0.0f;
         }
 
-        // --- RENDU ---
         BeginDrawing();
             ClearBackground(BLACK);
 
-            if (gameState != 3 && bgTexture.id > 0) {
-                DrawTexturePro(
-                    bgTexture, 
-                    Rectangle{ 0, 0, (float)bgTexture.width, (float)bgTexture.height },
-                    Rectangle{ 0, 0, (float)currentW, (float)currentH },
-                    Vector2{ 0, 0 }, 0.0f, WHITE
-                );
+            if (gameState != 3) {
+                if (totalFrames > 0 && bgTexture.id > 0) {
+                    DrawTexturePro(
+                        bgTexture, 
+                        Rectangle{ 0, 0, (float)bgTexture.width, (float)bgTexture.height },
+                        Rectangle{ 0, 0, (float)currentW, (float)currentH },
+                        Vector2{ 0, 0 }, 0.0f, WHITE
+                    );
+                } else {
+                    for (int i = 0; i < STAR_COUNT; i++) {
+                        DrawCircleV(Vector2{ stars[i].x, stars[i].y }, stars[i].size, stars[i].color);
+                    }
+                }
             }
 
-            // MENU PRINCIPAL (0)
             if (gameState == 0) {
                 float onlineScale = 0.8f;
                 float onlineW = (btnOnline.width > 0) ? btnOnline.width * onlineScale : 250.0f;
@@ -547,7 +537,6 @@ int main() {
                 }
             }
 
-            // MENU ONLINE (1)
             if (gameState == 1) {
                 if (texLogo.id > 0) DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ 20.0f, 15.0f, texLogo.width * 0.45f, texLogo.height * 0.45f }, Vector2{ 0, 0 }, 0.0f, WHITE);
 
@@ -574,7 +563,6 @@ int main() {
                 if (btnGoBack.id > 0) DrawTexturePro(btnGoBack, Rectangle{ 0, 0, (float)btnGoBack.width, (float)btnGoBack.height }, goBackRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, goBackRect) ? LIGHTGRAY : WHITE);
             }
 
-            // ÉCRAN HOST (2)
             if (gameState == 2) {
                 if (texLogo.id > 0) DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ 20.0f, 15.0f, texLogo.width * 0.45f, texLogo.height * 0.45f }, Vector2{ 0, 0 }, 0.0f, WHITE);
 
@@ -587,7 +575,6 @@ int main() {
                 float impostersY = 340.0f;
                 float spacing = 10.0f;
 
-                // Players (4 à 10)
                 if (texPlayersLabel.id > 0) {
                     float labelH = numSize;
                     float labelW = ((float)texPlayersLabel.width / texPlayersLabel.height) * labelH;
@@ -601,7 +588,6 @@ int main() {
                     if (texPlayerNum[i].id > 0) DrawTexturePro(texPlayerNum[i], Rectangle{ 0, 0, (float)texPlayerNum[i].width, (float)texPlayerNum[i].height }, numRect, Vector2{ 0, 0 }, 0.0f, tint);
                 }
 
-                // Imposters (1 à 3)
                 if (texImpostersLabel.id > 0) {
                     float labelH = numSize;
                     float labelW = ((float)texImpostersLabel.width / texImpostersLabel.height) * labelH;
@@ -615,13 +601,11 @@ int main() {
                     if (texImposterNum[i].id > 0) DrawTexturePro(texImposterNum[i], Rectangle{ 0, 0, (float)texImposterNum[i].width, (float)texImposterNum[i].height }, numRect, Vector2{ 0, 0 }, 0.0f, tint);
                 }
 
-                // Bouton retour (bas gauche)
                 float goBackW = btnGoBack.width * 0.8f;
                 float goBackH = btnGoBack.height * 0.8f;
                 Rectangle hostGoBackRect = { 20.0f, (float)currentH - goBackH - 20.0f, goBackW, goBackH };
                 if (btnGoBack.id > 0) DrawTexturePro(btnGoBack, Rectangle{ 0, 0, (float)btnGoBack.width, (float)btnGoBack.height }, hostGoBackRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, hostGoBackRect) ? LIGHTGRAY : WHITE);
 
-                // Bouton Host de confirmation (bas droite avec survol vert)
                 float confirmHostScale = 0.8f;
                 float confirmHostW = (btnHost.width > 0) ? btnHost.width * confirmHostScale : 200.0f;
                 float confirmHostH = (btnHost.height > 0) ? btnHost.height * confirmHostScale : 80.0f;
@@ -631,7 +615,6 @@ int main() {
                 if (confirmHostToDraw.id > 0) DrawTexturePro(confirmHostToDraw, Rectangle{ 0, 0, (float)confirmHostToDraw.width, (float)confirmHostToDraw.height }, confirmHostRect, Vector2{ 0, 0 }, 0.0f, WHITE);
             }
 
-            // LOBBY (3) : fond noir (ClearBackground) + Lobby.png (ratio conservé) + joueur
             if (gameState == 3) {
                 if (texLobby.id > 0) {
                     DrawTexturePro(
@@ -642,7 +625,7 @@ int main() {
                     );
                 }
 
-                int frameToShow = isPlayerMoving ? (1 + walkFrameIndex) : 0; // 0=Idle, 1..12=walk1..walk12
+                int frameToShow = isPlayerMoving ? (1 + walkFrameIndex) : 0;
                 Texture2D texPlayerCurrent = playerFrameTextures[frameToShow];
                 if (texPlayerCurrent.id > 0) {
                     float playerDrawW = texPlayerCurrent.width * playerScale;
@@ -656,7 +639,6 @@ int main() {
                     );
                 }
 
-                // Menu de sélection de couleur (touche R)
                 if (isColorMenuOpen) {
                     DrawRectangle(0, 0, currentW, currentH, Fade(BLACK, 0.6f));
 

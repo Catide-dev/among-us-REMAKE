@@ -18,17 +18,29 @@ struct Star {
 };
 
 Texture2D LoadTextureSafe(const char* relativePath) {
+    if (FileExists(relativePath)) {
+        return LoadTexture(relativePath);
+    }
     char fullPath[512];
+    snprintf(fullPath, sizeof(fullPath), "%s/%s", GetApplicationDirectory(), relativePath);
+    if (FileExists(fullPath)) {
+        return LoadTexture(fullPath);
+    }
     snprintf(fullPath, sizeof(fullPath), "%s%s", GetApplicationDirectory(), relativePath);
-    Texture2D tex = LoadTexture(fullPath);
-    return tex;
+    return LoadTexture(fullPath);
 }
 
 Image LoadImageSafe(const char* relativePath) {
+    if (FileExists(relativePath)) {
+        return LoadImage(relativePath);
+    }
     char fullPath[512];
+    snprintf(fullPath, sizeof(fullPath), "%s/%s", GetApplicationDirectory(), relativePath);
+    if (FileExists(fullPath)) {
+        return LoadImage(fullPath);
+    }
     snprintf(fullPath, sizeof(fullPath), "%s%s", GetApplicationDirectory(), relativePath);
-    Image img = LoadImage(fullPath);
-    return img;
+    return LoadImage(fullPath);
 }
 
 Color ScaleColor(Color base, float t) {
@@ -146,10 +158,12 @@ int main() {
     int totalFrames = 0;
     while (true) {
         char relativePath[256];
-        char fullPath[512];
         snprintf(relativePath, sizeof(relativePath), "Assets/frames/frame_%04d.png", totalFrames + 1);
-        snprintf(fullPath, sizeof(fullPath), "%s%s", GetApplicationDirectory(), relativePath);
-        if (!FileExists(fullPath)) break;
+        if (!FileExists(relativePath)) {
+            char fullPath[512];
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", GetApplicationDirectory(), relativePath);
+            if (!FileExists(fullPath)) break;
+        }
         totalFrames++;
     }
 
@@ -159,13 +173,7 @@ int main() {
 
     Texture2D bgTexture = { 0 };
     if (totalFrames > 0) {
-        char firstFramePath[512];
-        snprintf(firstFramePath, sizeof(firstFramePath), "%sAssets/frames/frame_0001.png", GetApplicationDirectory());
-        Image img = LoadImage(firstFramePath);
-        if (img.data != nullptr) {
-            bgTexture = LoadTextureFromImage(img);
-            UnloadImage(img);
-        }
+        bgTexture = LoadTextureSafe("Assets/frames/frame_0001.png");
     }
 
     Texture2D btnOnline       = LoadTextureSafe("Assets/Menu/Online.png");
@@ -306,13 +314,12 @@ int main() {
                 if (currentFrameIndex > totalFrames) currentFrameIndex = 1;
 
                 char framePath[512];
-                snprintf(framePath, sizeof(framePath), "%sAssets/frames/frame_%04d.png", GetApplicationDirectory(), currentFrameIndex);
+                snprintf(framePath, sizeof(framePath), "Assets/frames/frame_%04d.png", currentFrameIndex);
                 
-                Image img = LoadImage(framePath);
-                if (img.data != nullptr) {
-                    UnloadTexture(bgTexture);
-                    bgTexture = LoadTextureFromImage(img);
-                    UnloadImage(img);
+                Texture2D newFrame = LoadTextureSafe(framePath);
+                if (newFrame.id > 0) {
+                    if (bgTexture.id > 0) UnloadTexture(bgTexture);
+                    bgTexture = newFrame;
                 }
             }
         }
@@ -420,8 +427,8 @@ int main() {
                 isPlayerMoving = false;
                 walkFrameIndex = 0;
                 walkAnimTimer = 0.0f;
-                float playerDrawW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale : 0.0f;
-                float playerDrawH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale : 0.0f;
+                float playerDrawW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale : 50.0f;
+                float playerDrawH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale : 50.0f;
                 playerPos = {
                     lobbyImageRect.x + lobbyImageRect.width / 2.0f - playerDrawW / 2.0f,
                     lobbyImageRect.y + lobbyImageRect.height / 2.0f - playerDrawH / 2.0f
@@ -459,8 +466,8 @@ int main() {
                 if (IsKeyDown(KEY_UP)    || IsKeyDown(KEY_W)) moveY -= 1.0f;
 
                 if (actionDown) {
-                    float playerCenterW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale * 0.5f : 0.0f;
-                    float playerCenterH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale * 0.5f : 0.0f;
+                    float playerCenterW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale * 0.5f : 25.0f;
+                    float playerCenterH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale * 0.5f : 25.0f;
                     Vector2 pCenter = { playerPos.x + playerCenterW, playerPos.y + playerCenterH };
                     float dx = mousePos.x - pCenter.x;
                     float dy = mousePos.y - pCenter.y;
@@ -496,8 +503,8 @@ int main() {
                     walkAnimTimer = 0.0f;
                 }
 
-                float playerDrawW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale : 0.0f;
-                float playerDrawH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale : 0.0f;
+                float playerDrawW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale : 50.0f;
+                float playerDrawH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale : 50.0f;
 
                 if (playerPos.x < lobbyImageRect.x) playerPos.x = lobbyImageRect.x;
                 if (playerPos.y < lobbyImageRect.y) playerPos.y = lobbyImageRect.y;
@@ -515,10 +522,10 @@ int main() {
         }
 
         BeginDrawing();
-            ClearBackground(BLACK);
+            ClearBackground(DARKGRAY);
 
             if (gameState != 3) {
-                if (totalFrames > 0 && bgTexture.id > 0) {
+                if (bgTexture.id > 0) {
                     DrawTexturePro(
                         bgTexture, 
                         Rectangle{ 0, 0, (float)bgTexture.width, (float)bgTexture.height },
@@ -526,6 +533,7 @@ int main() {
                         Vector2{ 0, 0 }, 0.0f, WHITE
                     );
                 } else {
+                    DrawRectangle(0, 0, currentW, currentH, BLACK);
                     for (int i = 0; i < STAR_COUNT; i++) {
                         DrawCircleV(Vector2{ stars[i].x, stars[i].y }, stars[i].size, stars[i].color);
                     }
@@ -539,65 +547,135 @@ int main() {
                 Rectangle onlineRect = { 30.0f, (float)currentH * 0.35f, onlineW, onlineH };
                 
                 Texture2D onlineToDraw = (CheckCollisionPointRec(mousePos, onlineRect) && btnOnlineGreen.id > 0) ? btnOnlineGreen : btnOnline;
-                if (onlineToDraw.id > 0) DrawTexturePro(onlineToDraw, Rectangle{ 0, 0, (float)onlineToDraw.width, (float)onlineToDraw.height }, onlineRect, Vector2{ 0, 0 }, 0.0f, WHITE);
-                else {
-                    DrawRectangleRec(onlineRect, DARKGRAY);
-                    DrawText("ONLINE", (int)(onlineRect.x + 20), (int)(onlineRect.y + 30), 30, WHITE);
+                if (onlineToDraw.id > 0) {
+                    DrawTexturePro(onlineToDraw, Rectangle{ 0, 0, (float)onlineToDraw.width, (float)onlineToDraw.height }, onlineRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawRectangleRec(onlineRect, CheckCollisionPointRec(mousePos, onlineRect) ? GREEN : DARKBLUE);
+                    DrawRectangleLinesEx(onlineRect, 3.0f, WHITE);
+                    DrawText("ONLINE", (int)(onlineRect.x + 40), (int)(onlineRect.y + 30), 30, WHITE);
                 }
 
                 float settingsScale = 0.8f;
                 float settingsW = (btnSettings.width > 0) ? btnSettings.width * settingsScale : 80.0f;
                 float settingsH = (btnSettings.height > 0) ? btnSettings.height * settingsScale : 80.0f;
                 Rectangle settingsRect = { 30.0f, onlineRect.y + onlineRect.height + 20.0f, settingsW, settingsH };
-                if (btnSettings.id > 0) DrawTexturePro(btnSettings, Rectangle{ 0, 0, (float)btnSettings.width, (float)btnSettings.height }, settingsRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, settingsRect) ? LIGHTGRAY : WHITE);
-                else {
-                    DrawRectangleRec(settingsRect, GRAY);
-                    DrawText("*", (int)(settingsRect.x + 30), (int)(settingsRect.y + 20), 40, WHITE);
+                if (btnSettings.id > 0) {
+                    DrawTexturePro(btnSettings, Rectangle{ 0, 0, (float)btnSettings.width, (float)btnSettings.height }, settingsRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, settingsRect) ? LIGHTGRAY : WHITE);
+                } else {
+                    DrawRectangleRec(settingsRect, CheckCollisionPointRec(mousePos, settingsRect) ? GRAY : DARKGRAY);
+                    DrawRectangleLinesEx(settingsRect, 2.0f, WHITE);
+                    DrawText("SET", (int)(settingsRect.x + 15), (int)(settingsRect.y + 25), 20, WHITE);
                 }
 
-                if (texLogo.id > 0) DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ (float)currentW / 2.0f - (texLogo.width * 0.8f) / 2.0f, (float)currentH * 0.03f, texLogo.width * 0.8f, texLogo.height * 0.8f }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (texLogo.id > 0) {
+                    DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ (float)currentW / 2.0f - (texLogo.width * 0.8f) / 2.0f, (float)currentH * 0.03f, texLogo.width * 0.8f, texLogo.height * 0.8f }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawText("AMONG US", (int)((float)currentW / 2.0f - MeasureText("AMONG US", 60) / 2.0f), 40, 60, WHITE);
+                }
 
-                if (menuScaleAnim > 0.001f && texSettingsMenu.id > 0) {
-                    float menuW = (float)texSettingsMenu.width;
-                    float menuH = (float)texSettingsMenu.height;
-                    Rectangle settingsMenuRect = { (float)currentW / 2.0f - ((menuW * menuScaleAnim) / 2.0f), (float)currentH / 2.0f - ((menuH * menuScaleAnim) / 2.0f), menuW * menuScaleAnim, menuH * menuScaleAnim };
-                    Color menuTint = WHITE;
-                    menuTint.a = (unsigned char)(255 * menuScaleAnim);
-                    DrawTexturePro(texSettingsMenu, Rectangle{ 0, 0, menuW, menuH }, settingsMenuRect, Vector2{ 0, 0 }, 0.0f, menuTint);
+                if (menuScaleAnim > 0.001f) {
+                    if (texSettingsMenu.id > 0) {
+                        float menuW = (float)texSettingsMenu.width;
+                        float menuH = (float)texSettingsMenu.height;
+                        Rectangle settingsMenuRect = { (float)currentW / 2.0f - ((menuW * menuScaleAnim) / 2.0f), (float)currentH / 2.0f - ((menuH * menuScaleAnim) / 2.0f), menuW * menuScaleAnim, menuH * menuScaleAnim };
+                        Color menuTint = WHITE;
+                        menuTint.a = (unsigned char)(255 * menuScaleAnim);
+                        DrawTexturePro(texSettingsMenu, Rectangle{ 0, 0, menuW, menuH }, settingsMenuRect, Vector2{ 0, 0 }, 0.0f, menuTint);
+                    } else {
+                        Rectangle settingsMenuRect = { (float)currentW / 2.0f - 200.0f * menuScaleAnim, (float)currentH / 2.0f - 150.0f * menuScaleAnim, 400.0f * menuScaleAnim, 300.0f * menuScaleAnim };
+                        DrawRectangleRec(settingsMenuRect, GRAY);
+                        DrawRectangleLinesEx(settingsMenuRect, 3.0f, WHITE);
+                        DrawText("PARAMETRES", (int)(settingsMenuRect.x + 50), (int)(settingsMenuRect.y + 30), 30, WHITE);
+                    }
                 }
             }
 
             if (gameState == 1) {
-                if (texLogo.id > 0) DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ 20.0f, 15.0f, texLogo.width * 0.45f, texLogo.height * 0.45f }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (texLogo.id > 0) {
+                    DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ 20.0f, 15.0f, texLogo.width * 0.45f, texLogo.height * 0.45f }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawText("AMONG US", 20, 20, 30, WHITE);
+                }
 
                 float hostScale = 0.8f;
-                Rectangle hostRect = { (float)currentW / 2.0f - (btnHost.width * hostScale) / 2.0f, (float)currentH * 0.25f, btnHost.width * hostScale, btnHost.height * hostScale };
+                float hostW = (btnHost.width > 0) ? btnHost.width * hostScale : 200.0f;
+                float hostH = (btnHost.height > 0) ? btnHost.height * hostScale : 80.0f;
+                Rectangle hostRect = { (float)currentW / 2.0f - hostW / 2.0f, (float)currentH * 0.25f, hostW, hostH };
                 Texture2D hostToDraw = (CheckCollisionPointRec(mousePos, hostRect) && btnHostGreen.id > 0) ? btnHostGreen : btnHost;
-                if (hostToDraw.id > 0) DrawTexturePro(hostToDraw, Rectangle{ 0, 0, (float)hostToDraw.width, (float)hostToDraw.height }, hostRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (hostToDraw.id > 0) {
+                    DrawTexturePro(hostToDraw, Rectangle{ 0, 0, (float)hostToDraw.width, (float)hostToDraw.height }, hostRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawRectangleRec(hostRect, CheckCollisionPointRec(mousePos, hostRect) ? GREEN : DARKBLUE);
+                    DrawRectangleLinesEx(hostRect, 3.0f, WHITE);
+                    DrawText("HOST", (int)(hostRect.x + 60), (int)(hostRect.y + 25), 30, WHITE);
+                }
 
                 float joinScale = 0.8f;
-                Rectangle joinRect = { (float)currentW / 2.0f - (btnJoin.width * joinScale) / 2.0f, hostRect.y + hostRect.height + 15.0f, btnJoin.width * joinScale, btnJoin.height * joinScale };
+                float joinW = (btnJoin.width > 0) ? btnJoin.width * joinScale : 200.0f;
+                float joinH = (btnJoin.height > 0) ? btnJoin.height * joinScale : 80.0f;
+                Rectangle joinRect = { (float)currentW / 2.0f - joinW / 2.0f, hostRect.y + hostRect.height + 15.0f, joinW, joinH };
                 Texture2D joinToDraw = (CheckCollisionPointRec(mousePos, joinRect) && btnJoinGreen.id > 0) ? btnJoinGreen : btnJoin;
-                if (joinToDraw.id > 0) DrawTexturePro(joinToDraw, Rectangle{ 0, 0, (float)joinToDraw.width, (float)joinToDraw.height }, joinRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (joinToDraw.id > 0) {
+                    DrawTexturePro(joinToDraw, Rectangle{ 0, 0, (float)joinToDraw.width, (float)joinToDraw.height }, joinRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawRectangleRec(joinRect, CheckCollisionPointRec(mousePos, joinRect) ? GREEN : DARKBLUE);
+                    DrawRectangleLinesEx(joinRect, 3.0f, WHITE);
+                    DrawText("JOIN", (int)(joinRect.x + 60), (int)(joinRect.y + 25), 30, WHITE);
+                }
 
                 float codeScale = 0.8f;
-                Rectangle codeRect = { (float)currentW / 2.0f - (texCode.width * codeScale) / 2.0f, joinRect.y + joinRect.height + 15.0f, texCode.width * codeScale, texCode.height * codeScale };
+                float codeW = (texCode.width > 0) ? texCode.width * codeScale : 250.0f;
+                float codeH = (texCode.height > 0) ? texCode.height * codeScale : 80.0f;
+                Rectangle codeRect = { (float)currentW / 2.0f - codeW / 2.0f, joinRect.y + joinRect.height + 15.0f, codeW, codeH };
                 Texture2D codeToDraw = ((CheckCollisionPointRec(mousePos, codeRect) || isCodeBoxActive) && texCodeGreen.id > 0) ? texCodeGreen : texCode;
-                if (codeToDraw.id > 0) DrawTexturePro(codeToDraw, Rectangle{ 0, 0, (float)codeToDraw.width, (float)codeToDraw.height }, codeRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (codeToDraw.id > 0) {
+                    DrawTexturePro(codeToDraw, Rectangle{ 0, 0, (float)codeToDraw.width, (float)codeToDraw.height }, codeRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawRectangleRec(codeRect, isCodeBoxActive ? DARKGRAY : GRAY);
+                    DrawRectangleLinesEx(codeRect, 3.0f, WHITE);
+                    if (letterCount == 0) DrawText("ENTER CODE", (int)(codeRect.x + 40), (int)(codeRect.y + 25), 25, LIGHTGRAY);
+                }
 
                 if (letterCount > 0) DrawText(roomCode, (int)(codeRect.x + codeRect.width / 2.0f - MeasureText(roomCode, 30) / 2.0f), (int)(codeRect.y + 20), 30, WHITE);
 
-                float goBackW = btnGoBack.width * 0.8f;
-                float goBackH = btnGoBack.height * 0.8f;
+                float goBackW = (btnGoBack.width > 0) ? btnGoBack.width * 0.8f : 80.0f;
+                float goBackH = (btnGoBack.height > 0) ? btnGoBack.height * 0.8f : 80.0f;
                 Rectangle goBackRect = { 15.0f, (float)currentH - goBackH - 15.0f, goBackW, goBackH };
-                if (btnGoBack.id > 0) DrawTexturePro(btnGoBack, Rectangle{ 0, 0, (float)btnGoBack.width, (float)btnGoBack.height }, goBackRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, goBackRect) ? LIGHTGRAY : WHITE);
+                if (btnGoBack.id > 0) {
+                    DrawTexturePro(btnGoBack, Rectangle{ 0, 0, (float)btnGoBack.width, (float)btnGoBack.height }, goBackRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, goBackRect) ? LIGHTGRAY : WHITE);
+                } else {
+                    DrawRectangleRec(goBackRect, CheckCollisionPointRec(mousePos, goBackRect) ? RED : MAROON);
+                    DrawRectangleLinesEx(goBackRect, 2.0f, WHITE);
+                    DrawText("<", (int)(goBackRect.x + 30), (int)(goBackRect.y + 20), 40, WHITE);
+                }
+
+                if (showNotExistError) {
+                    Rectangle errRect = { (float)currentW / 2.0f - 250.0f, (float)currentH / 2.0f - 150.0f, 500.0f, 300.0f };
+                    if (texDoesntExist.id > 0) {
+                        DrawTexturePro(texDoesntExist, Rectangle{ 0, 0, (float)texDoesntExist.width, (float)texDoesntExist.height }, errRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                    } else {
+                        DrawRectangleRec(errRect, RED);
+                        DrawRectangleLinesEx(errRect, 4.0f, WHITE);
+                        DrawText("ROOM DOES NOT EXIST", (int)(errRect.x + 50), (int)(errRect.y + 100), 30, WHITE);
+                    }
+                }
             }
 
             if (gameState == 2) {
-                if (texLogo.id > 0) DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ 20.0f, 15.0f, texLogo.width * 0.45f, texLogo.height * 0.45f }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (texLogo.id > 0) {
+                    DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ 20.0f, 15.0f, texLogo.width * 0.45f, texLogo.height * 0.45f }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawText("AMONG US", 20, 20, 30, WHITE);
+                }
 
                 Rectangle skeldRect = { 120.0f, 110.0f, 250.0f, 468.0f };
-                if (texSkeldHost.id > 0) DrawTexturePro(texSkeldHost, Rectangle{ 0, 0, (float)texSkeldHost.width, (float)texSkeldHost.height }, skeldRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (texSkeldHost.id > 0) {
+                    DrawTexturePro(texSkeldHost, Rectangle{ 0, 0, (float)texSkeldHost.width, (float)texSkeldHost.height }, skeldRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawRectangleRec(skeldRect, BLUE);
+                    DrawRectangleLinesEx(skeldRect, 3.0f, WHITE);
+                    DrawText("THE SKELD", (int)(skeldRect.x + 40), (int)(skeldRect.y + 200), 30, WHITE);
+                }
 
                 float numSize = 45.0f;
                 float startX = 600.0f;
@@ -609,32 +687,54 @@ int main() {
                     float labelH = numSize;
                     float labelW = ((float)texPlayersLabel.width / texPlayersLabel.height) * labelH;
                     DrawTexturePro(texPlayersLabel, Rectangle{ 0, 0, (float)texPlayersLabel.width, (float)texPlayersLabel.height }, Rectangle{ startX - labelW - 15.0f, playersY, labelW, labelH }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawText("PLAYERS:", (int)(startX - 180.0f), (int)(playersY + 10), 30, WHITE);
                 }
 
                 for (int i = 0; i < 7; i++) {
                     int val = i + 4;
                     Rectangle numRect = { startX + i * (numSize + spacing), playersY, numSize, numSize };
                     Color tint = (selectedMaxPlayers == val) ? GREEN : (CheckCollisionPointRec(mousePos, numRect) ? LIGHTGRAY : WHITE);
-                    if (texPlayerNum[i].id > 0) DrawTexturePro(texPlayerNum[i], Rectangle{ 0, 0, (float)texPlayerNum[i].width, (float)texPlayerNum[i].height }, numRect, Vector2{ 0, 0 }, 0.0f, tint);
+                    if (texPlayerNum[i].id > 0) {
+                        DrawTexturePro(texPlayerNum[i], Rectangle{ 0, 0, (float)texPlayerNum[i].width, (float)texPlayerNum[i].height }, numRect, Vector2{ 0, 0 }, 0.0f, tint);
+                    } else {
+                        DrawRectangleRec(numRect, (selectedMaxPlayers == val) ? GREEN : DARKGRAY);
+                        DrawRectangleLinesEx(numRect, 2.0f, WHITE);
+                        DrawText(TextFormat("%d", val), (int)(numRect.x + 15), (int)(numRect.y + 10), 25, WHITE);
+                    }
                 }
 
                 if (texImpostersLabel.id > 0) {
                     float labelH = numSize;
                     float labelW = ((float)texImpostersLabel.width / texImpostersLabel.height) * labelH;
                     DrawTexturePro(texImpostersLabel, Rectangle{ 0, 0, (float)texImpostersLabel.width, (float)texImpostersLabel.height }, Rectangle{ startX - labelW - 15.0f, impostersY, labelW, labelH }, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawText("IMPOSTERS:", (int)(startX - 200.0f), (int)(impostersY + 10), 30, WHITE);
                 }
 
                 for (int i = 0; i < 3; i++) {
                     int val = i + 1;
                     Rectangle numRect = { startX + i * (numSize + spacing), impostersY, numSize, numSize };
                     Color tint = (selectedImposters == val) ? RED : (CheckCollisionPointRec(mousePos, numRect) ? LIGHTGRAY : WHITE);
-                    if (texImposterNum[i].id > 0) DrawTexturePro(texImposterNum[i], Rectangle{ 0, 0, (float)texImposterNum[i].width, (float)texImposterNum[i].height }, numRect, Vector2{ 0, 0 }, 0.0f, tint);
+                    if (texImposterNum[i].id > 0) {
+                        DrawTexturePro(texImposterNum[i], Rectangle{ 0, 0, (float)texImposterNum[i].width, (float)texImposterNum[i].height }, numRect, Vector2{ 0, 0 }, 0.0f, tint);
+                    } else {
+                        DrawRectangleRec(numRect, (selectedImposters == val) ? RED : DARKGRAY);
+                        DrawRectangleLinesEx(numRect, 2.0f, WHITE);
+                        DrawText(TextFormat("%d", val), (int)(numRect.x + 15), (int)(numRect.y + 10), 25, WHITE);
+                    }
                 }
 
-                float goBackW = btnGoBack.width * 0.8f;
-                float goBackH = btnGoBack.height * 0.8f;
+                float goBackW = (btnGoBack.width > 0) ? btnGoBack.width * 0.8f : 80.0f;
+                float goBackH = (btnGoBack.height > 0) ? btnGoBack.height * 0.8f : 80.0f;
                 Rectangle hostGoBackRect = { 20.0f, (float)currentH - goBackH - 20.0f, goBackW, goBackH };
-                if (btnGoBack.id > 0) DrawTexturePro(btnGoBack, Rectangle{ 0, 0, (float)btnGoBack.width, (float)btnGoBack.height }, hostGoBackRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, hostGoBackRect) ? LIGHTGRAY : WHITE);
+                if (btnGoBack.id > 0) {
+                    DrawTexturePro(btnGoBack, Rectangle{ 0, 0, (float)btnGoBack.width, (float)btnGoBack.height }, hostGoBackRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, hostGoBackRect) ? LIGHTGRAY : WHITE);
+                } else {
+                    DrawRectangleRec(hostGoBackRect, CheckCollisionPointRec(mousePos, hostGoBackRect) ? RED : MAROON);
+                    DrawRectangleLinesEx(hostGoBackRect, 2.0f, WHITE);
+                    DrawText("<", (int)(hostGoBackRect.x + 30), (int)(hostGoBackRect.y + 20), 40, WHITE);
+                }
 
                 float confirmHostScale = 0.8f;
                 float confirmHostW = (btnHost.width > 0) ? btnHost.width * confirmHostScale : 200.0f;
@@ -642,7 +742,13 @@ int main() {
                 Rectangle confirmHostRect = { (float)currentW - confirmHostW - 20.0f, (float)currentH - confirmHostH - 20.0f, confirmHostW, confirmHostH };
                 
                 Texture2D confirmHostToDraw = (CheckCollisionPointRec(mousePos, confirmHostRect) && btnHostGreen.id > 0) ? btnHostGreen : btnHost;
-                if (confirmHostToDraw.id > 0) DrawTexturePro(confirmHostToDraw, Rectangle{ 0, 0, (float)confirmHostToDraw.width, (float)confirmHostToDraw.height }, confirmHostRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                if (confirmHostToDraw.id > 0) {
+                    DrawTexturePro(confirmHostToDraw, Rectangle{ 0, 0, (float)confirmHostToDraw.width, (float)confirmHostToDraw.height }, confirmHostRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                } else {
+                    DrawRectangleRec(confirmHostRect, CheckCollisionPointRec(mousePos, confirmHostRect) ? GREEN : DARKBLUE);
+                    DrawRectangleLinesEx(confirmHostRect, 3.0f, WHITE);
+                    DrawText("CONFIRM", (int)(confirmHostRect.x + 30), (int)(confirmHostRect.y + 25), 30, WHITE);
+                }
             }
 
             if (gameState == 3) {
@@ -653,6 +759,10 @@ int main() {
                         lobbyImageRect,
                         Vector2{ 0, 0 }, 0.0f, WHITE
                     );
+                } else {
+                    DrawRectangleRec(lobbyImageRect, DARKGRAY);
+                    DrawRectangleLinesEx(lobbyImageRect, 4.0f, WHITE);
+                    DrawText("LOBBY", (int)(lobbyImageRect.x + 50), (int)(lobbyImageRect.y + 50), 40, WHITE);
                 }
 
                 int frameToShow = isPlayerMoving ? (1 + walkFrameIndex) : 0;
@@ -667,6 +777,8 @@ int main() {
                         Rectangle{ playerPos.x, playerPos.y, playerDrawW, playerDrawH },
                         Vector2{ 0, 0 }, 0.0f, WHITE
                     );
+                } else {
+                    DrawCircleV(Vector2{ playerPos.x + 25.0f, playerPos.y + 25.0f }, 25.0f, selectedPlayerColor);
                 }
 
                 if (isColorMenuOpen) {
@@ -701,32 +813,36 @@ int main() {
     }
 
     if (bgTexture.id > 0) UnloadTexture(bgTexture);
-    UnloadTexture(btnOnline);
-    UnloadTexture(btnOnlineGreen);
-    UnloadTexture(btnSettings);
-    UnloadTexture(texLogo);
-    UnloadTexture(texSettingsMenu);
-    UnloadTexture(texFb);
-    UnloadTexture(btnHost);
-    UnloadTexture(btnHostGreen);
-    UnloadTexture(btnJoin);
-    UnloadTexture(btnJoinGreen);
-    UnloadTexture(btnGoBack);
-    UnloadTexture(texCode);
-    UnloadTexture(texCodeGreen);
-    UnloadTexture(texDoesntExist);
-    UnloadTexture(texSkeldHost);
-    UnloadTexture(texLobby);
+    if (btnOnline.id > 0) UnloadTexture(btnOnline);
+    if (btnOnlineGreen.id > 0) UnloadTexture(btnOnlineGreen);
+    if (btnSettings.id > 0) UnloadTexture(btnSettings);
+    if (texLogo.id > 0) UnloadTexture(texLogo);
+    if (texSettingsMenu.id > 0) UnloadTexture(texSettingsMenu);
+    if (texFb.id > 0) UnloadTexture(texFb);
+    if (btnHost.id > 0) UnloadTexture(btnHost);
+    if (btnHostGreen.id > 0) UnloadTexture(btnHostGreen);
+    if (btnJoin.id > 0) UnloadTexture(btnJoin);
+    if (btnJoinGreen.id > 0) UnloadTexture(btnJoinGreen);
+    if (btnGoBack.id > 0) UnloadTexture(btnGoBack);
+    if (texCode.id > 0) UnloadTexture(texCode);
+    if (texCodeGreen.id > 0) UnloadTexture(texCodeGreen);
+    if (texDoesntExist.id > 0) UnloadTexture(texDoesntExist);
+    if (texSkeldHost.id > 0) UnloadTexture(texSkeldHost);
+    if (texLobby.id > 0) UnloadTexture(texLobby);
     for (int i = 0; i < PLAYER_FRAME_COUNT; i++) {
         if (playerFrameTextures[i].id > 0) UnloadTexture(playerFrameTextures[i]);
         if (playerFrameImagesCPU[i].data != nullptr) UnloadImage(playerFrameImagesCPU[i]);
     }
 
-    UnloadTexture(texPlayersLabel);
-    for (int i = 0; i < 7; i++) UnloadTexture(texPlayerNum[i]);
+    if (texPlayersLabel.id > 0) UnloadTexture(texPlayersLabel);
+    for (int i = 0; i < 7; i++) {
+        if (texPlayerNum[i].id > 0) UnloadTexture(texPlayerNum[i]);
+    }
 
-    UnloadTexture(texImpostersLabel);
-    for (int i = 0; i < 3; i++) UnloadTexture(texImposterNum[i]);
+    if (texImpostersLabel.id > 0) UnloadTexture(texImpostersLabel);
+    for (int i = 0; i < 3; i++) {
+        if (texImposterNum[i].id > 0) UnloadTexture(texImposterNum[i]);
+    }
 
     CloseWindow();
     return 0;

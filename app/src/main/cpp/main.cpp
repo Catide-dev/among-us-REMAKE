@@ -252,7 +252,14 @@ int main() {
         int currentW = GetScreenWidth();
         int currentH = GetScreenHeight();
         float deltaTime = GetFrameTime();
+        
         Vector2 mousePos = GetMousePosition();
+        if (GetTouchPointCount() > 0) {
+            mousePos = GetTouchPosition(0);
+        }
+
+        bool actionPressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || (GetTouchPointCount() > 0 && IsGestureDetected(GESTURE_TAP));
+        bool actionDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT) || (GetTouchPointCount() > 0);
 
         for (int i = 0; i < STAR_COUNT; i++) {
             stars[i].x -= stars[i].speed * deltaTime;
@@ -321,8 +328,8 @@ int main() {
             float settingsH = (btnSettings.height > 0) ? btnSettings.height * settingsScale : 80.0f;
             Rectangle settingsRect = { 30.0f, onlineRect.y + onlineRect.height + 20.0f, settingsW, settingsH };
 
-            if (CheckCollisionPointRec(mousePos, onlineRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) gameState = 1;
-            if (CheckCollisionPointRec(mousePos, settingsRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) isSettingsOpen = !isSettingsOpen;
+            if (CheckCollisionPointRec(mousePos, onlineRect) && actionPressed) gameState = 1;
+            if (CheckCollisionPointRec(mousePos, settingsRect) && actionPressed) isSettingsOpen = !isSettingsOpen;
         }
 
         if (gameState == 1) {
@@ -342,8 +349,8 @@ int main() {
             Rectangle codeRect = { (float)currentW / 2.0f - codeW / 2.0f, joinRect.y + joinRect.height + 15.0f, codeW, codeH };
 
             if (!showNotExistError) {
-                if (CheckCollisionPointRec(mousePos, hostRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) gameState = 2;
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) isCodeBoxActive = CheckCollisionPointRec(mousePos, codeRect);
+                if (CheckCollisionPointRec(mousePos, hostRect) && actionPressed) gameState = 2;
+                if (actionPressed) isCodeBoxActive = CheckCollisionPointRec(mousePos, codeRect);
 
                 if (isCodeBoxActive) {
                     int key = GetCharPressed();
@@ -369,12 +376,12 @@ int main() {
                 float goBackW = (btnGoBack.width > 0) ? btnGoBack.width * 0.8f : 80.0f;
                 float goBackH = (btnGoBack.height > 0) ? btnGoBack.height * 0.8f : 80.0f;
                 Rectangle goBackRect = { 15.0f, (float)currentH - goBackH - 15.0f, goBackW, goBackH };
-                if (CheckCollisionPointRec(mousePos, goBackRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) gameState = 0;
+                if (CheckCollisionPointRec(mousePos, goBackRect) && actionPressed) gameState = 0;
             } else {
                 float errGoBackW = (btnGoBack.width > 0) ? btnGoBack.width * 0.6f : 60.0f;
                 float errGoBackH = (btnGoBack.height > 0) ? btnGoBack.height * 0.6f : 60.0f;
                 Rectangle errorGoBackRect = { (float)currentW / 2.0f - 250.0f + 15.0f, (float)currentH / 2.0f - 150.0f + 15.0f, errGoBackW, errGoBackH };
-                if (CheckCollisionPointRec(mousePos, errorGoBackRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) showNotExistError = false;
+                if (CheckCollisionPointRec(mousePos, errorGoBackRect) && actionPressed) showNotExistError = false;
             }
         }
 
@@ -384,7 +391,7 @@ int main() {
             float goBackH = (btnGoBack.height > 0) ? btnGoBack.height * goBackScale : 80.0f;
             Rectangle hostGoBackRect = { 20.0f, (float)currentH - goBackH - 20.0f, goBackW, goBackH };
 
-            if (CheckCollisionPointRec(mousePos, hostGoBackRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) gameState = 1;
+            if (CheckCollisionPointRec(mousePos, hostGoBackRect) && actionPressed) gameState = 1;
 
             float numSize = 45.0f;
             float startX = 600.0f;
@@ -394,12 +401,12 @@ int main() {
 
             for (int i = 0; i < 7; i++) {
                 Rectangle numRect = { startX + i * (numSize + spacing), playersY, numSize, numSize };
-                if (CheckCollisionPointRec(mousePos, numRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedMaxPlayers = i + 4;
+                if (CheckCollisionPointRec(mousePos, numRect) && actionPressed) selectedMaxPlayers = i + 4;
             }
 
             for (int i = 0; i < 3; i++) {
                 Rectangle numRect = { startX + i * (numSize + spacing), impostersY, numSize, numSize };
-                if (CheckCollisionPointRec(mousePos, numRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedImposters = i + 1;
+                if (CheckCollisionPointRec(mousePos, numRect) && actionPressed) selectedImposters = i + 1;
             }
 
             float confirmHostScale = 0.8f;
@@ -407,7 +414,7 @@ int main() {
             float confirmHostH = (btnHost.height > 0) ? btnHost.height * confirmHostScale : 80.0f;
             Rectangle confirmHostRect = { (float)currentW - confirmHostW - 20.0f, (float)currentH - confirmHostH - 20.0f, confirmHostW, confirmHostH };
 
-            if (CheckCollisionPointRec(mousePos, confirmHostRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (CheckCollisionPointRec(mousePos, confirmHostRect) && actionPressed) {
                 gameState = 3;
                 isColorMenuOpen = false;
                 isPlayerMoving = false;
@@ -438,7 +445,7 @@ int main() {
                 for (int i = 0; i < colorPaletteCount; i++) {
                     int col = i % cols, row = i / cols;
                     Rectangle swatchRect = { gridX + col * (swatchSize + spacing), gridY + row * (swatchSize + spacing), swatchSize, swatchSize };
-                    if (CheckCollisionPointRec(mousePos, swatchRect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (CheckCollisionPointRec(mousePos, swatchRect) && actionPressed) {
                         selectedPlayerColor = colorPalette[i].color;
                         ApplyPlayerColorAll(playerFrameImagesCPU, playerFrameTextures, PLAYER_FRAME_COUNT, selectedPlayerColor);
                         isColorMenuOpen = false;
@@ -451,12 +458,27 @@ int main() {
                 if (IsKeyDown(KEY_DOWN)  || IsKeyDown(KEY_S)) moveY += 1.0f;
                 if (IsKeyDown(KEY_UP)    || IsKeyDown(KEY_W)) moveY -= 1.0f;
 
+                if (actionDown) {
+                    float playerCenterW = (playerFrameTextures[0].width > 0) ? playerFrameTextures[0].width * playerScale * 0.5f : 0.0f;
+                    float playerCenterH = (playerFrameTextures[0].height > 0) ? playerFrameTextures[0].height * playerScale * 0.5f : 0.0f;
+                    Vector2 pCenter = { playerPos.x + playerCenterW, playerPos.y + playerCenterH };
+                    float dx = mousePos.x - pCenter.x;
+                    float dy = mousePos.y - pCenter.y;
+                    float dist = sqrtf(dx * dx + dy * dy);
+                    if (dist > 15.0f) {
+                        moveX = dx / dist;
+                        moveY = dy / dist;
+                    }
+                }
+
                 isPlayerMoving = (moveX != 0.0f || moveY != 0.0f);
 
                 if (isPlayerMoving) {
-                    float len = sqrtf(moveX * moveX + moveY * moveY);
-                    moveX /= len;
-                    moveY /= len;
+                    if (!actionDown) {
+                        float len = sqrtf(moveX * moveX + moveY * moveY);
+                        moveX /= len;
+                        moveY /= len;
+                    }
 
                     if (moveX > 0.0f) playerFacingLeft = false;
                     if (moveX < 0.0f) playerFacingLeft = true;
@@ -518,12 +540,20 @@ int main() {
                 
                 Texture2D onlineToDraw = (CheckCollisionPointRec(mousePos, onlineRect) && btnOnlineGreen.id > 0) ? btnOnlineGreen : btnOnline;
                 if (onlineToDraw.id > 0) DrawTexturePro(onlineToDraw, Rectangle{ 0, 0, (float)onlineToDraw.width, (float)onlineToDraw.height }, onlineRect, Vector2{ 0, 0 }, 0.0f, WHITE);
+                else {
+                    DrawRectangleRec(onlineRect, DARKGRAY);
+                    DrawText("ONLINE", (int)(onlineRect.x + 20), (int)(onlineRect.y + 30), 30, WHITE);
+                }
 
                 float settingsScale = 0.8f;
                 float settingsW = (btnSettings.width > 0) ? btnSettings.width * settingsScale : 80.0f;
                 float settingsH = (btnSettings.height > 0) ? btnSettings.height * settingsScale : 80.0f;
                 Rectangle settingsRect = { 30.0f, onlineRect.y + onlineRect.height + 20.0f, settingsW, settingsH };
                 if (btnSettings.id > 0) DrawTexturePro(btnSettings, Rectangle{ 0, 0, (float)btnSettings.width, (float)btnSettings.height }, settingsRect, Vector2{ 0, 0 }, 0.0f, CheckCollisionPointRec(mousePos, settingsRect) ? LIGHTGRAY : WHITE);
+                else {
+                    DrawRectangleRec(settingsRect, GRAY);
+                    DrawText("*", (int)(settingsRect.x + 30), (int)(settingsRect.y + 20), 40, WHITE);
+                }
 
                 if (texLogo.id > 0) DrawTexturePro(texLogo, Rectangle{ 0, 0, (float)texLogo.width, (float)texLogo.height }, Rectangle{ (float)currentW / 2.0f - (texLogo.width * 0.8f) / 2.0f, (float)currentH * 0.03f, texLogo.width * 0.8f, texLogo.height * 0.8f }, Vector2{ 0, 0 }, 0.0f, WHITE);
 
